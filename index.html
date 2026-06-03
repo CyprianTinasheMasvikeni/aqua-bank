@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Aqua Bank">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Aqua Bank</title>
+    <base href="/aquabank/">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===================== SETUP ===================== -->
+<div id="screen-setup" class="screen hidden">
+    <div class="screen-content centered">
+        <div class="logo">🏦</div>
+        <h1>Aqua Bank</h1>
+        <p class="subtitle">Your personal savings vault</p>
+
+        <div id="setup-step-1" class="setup-step">
+            <h2>Create your PIN</h2>
+            <p>4-digit PIN to protect your savings</p>
+            <div class="pin-display" id="setup-pin-display">
+                <span class="pin-dot"></span><span class="pin-dot"></span>
+                <span class="pin-dot"></span><span class="pin-dot"></span>
+            </div>
+            <div class="keypad" id="setup-keypad-1"></div>
+        </div>
+
+        <div id="setup-step-2" class="setup-step hidden">
+            <h2>Confirm PIN</h2>
+            <p>Enter your PIN again</p>
+            <div class="pin-display" id="setup-confirm-display">
+                <span class="pin-dot"></span><span class="pin-dot"></span>
+                <span class="pin-dot"></span><span class="pin-dot"></span>
+            </div>
+            <p class="pin-error hidden" id="setup-mismatch">PINs don't match — try again</p>
+            <div class="keypad" id="setup-keypad-2"></div>
+        </div>
+
+        <div id="setup-step-3" class="setup-step hidden">
+            <h2>Starting Balance</h2>
+            <p>How much do you have saved already?</p>
+            <div class="input-group">
+                <span class="currency-prefix">$</span>
+                <input type="number" id="starting-balance" placeholder="1500" min="0" inputmode="decimal">
+            </div>
+            <button class="btn-primary" onclick="completeSetup()">Start Saving 🚗</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== PIN ===================== -->
+<div id="screen-pin" class="screen hidden">
+    <div class="screen-content centered">
+        <div class="logo">🏦</div>
+        <h1>Aqua Bank</h1>
+        <p class="subtitle" id="pin-subtitle">Enter your PIN</p>
+        <div class="pin-display" id="pin-display">
+            <span class="pin-dot"></span><span class="pin-dot"></span>
+            <span class="pin-dot"></span><span class="pin-dot"></span>
+        </div>
+        <p class="pin-error" id="pin-error"></p>
+        <div class="keypad" id="pin-keypad"></div>
+    </div>
+</div>
+
+<!-- ===================== DASHBOARD ===================== -->
+<div id="screen-dashboard" class="screen hidden">
+    <div class="screen-content">
+
+        <div class="header">
+            <span class="header-title">AQUA BANK</span>
+            <button class="icon-btn" onclick="lockApp()">🔒</button>
+        </div>
+
+        <div id="pending-alert" class="alert-card hidden">
+            <div class="alert-icon">⏳</div>
+            <div class="alert-text">
+                <strong>Withdrawal Pending</strong>
+                <span id="pending-countdown"></span>
+            </div>
+            <button class="btn-small" onclick="showScreen('pending')">View</button>
+        </div>
+
+        <div class="balance-card">
+            <div class="balance-label">AQUA FUND BALANCE</div>
+            <div class="balance-amount" id="dashboard-balance">$0</div>
+            <div class="balance-goal">of <span id="dashboard-target">$10,330</span> goal</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="dashboard-progress" style="width:1%"></div>
+            </div>
+            <div class="progress-labels">
+                <span id="dashboard-percent">0%</span>
+                <span id="dashboard-remaining">$10,330 to go</span>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-streak">0</div>
+                <div class="stat-label">day streak</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-months">17</div>
+                <div class="stat-label">months left</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-monthly">$519</div>
+                <div class="stat-label">save/month</div>
+            </div>
+        </div>
+
+        <div class="actions-grid">
+            <button class="action-btn deposit"    onclick="showScreen('deposit')">
+                <span class="action-icon">💰</span><span>Deposit</span>
+            </button>
+            <button class="action-btn withdraw"   onclick="showScreen('withdraw')">
+                <span class="action-icon">📤</span><span>Withdraw</span>
+            </button>
+            <button class="action-btn history"    onclick="showScreen('history')">
+                <span class="action-icon">📋</span><span>History</span>
+            </button>
+            <button class="action-btn milestones" onclick="showScreen('milestones')">
+                <span class="action-icon">🎯</span><span>Goals</span>
+            </button>
+        </div>
+
+        <div class="section-header">Recent Activity</div>
+        <div id="recent-transactions" class="transaction-list"></div>
+
+    </div>
+</div>
+
+<!-- ===================== DEPOSIT ===================== -->
+<div id="screen-deposit" class="screen hidden">
+    <div class="screen-content">
+        <div class="header">
+            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
+            <span class="header-title">DEPOSIT</span>
+        </div>
+        <div class="form-card">
+            <div class="form-balance">Current balance: <strong id="deposit-current-balance">$0</strong></div>
+            <div class="amount-input-group">
+                <span class="currency-symbol">$</span>
+                <input type="number" id="deposit-amount" placeholder="0" min="1" inputmode="decimal"
+                       oninput="onDepositAmountChange()">
+            </div>
+            <div class="form-group">
+                <input type="text" id="deposit-note" placeholder="Note — e.g. June salary">
+            </div>
+            <div class="new-balance-preview">After deposit: <strong id="deposit-new-balance">$0</strong></div>
+            <button class="btn-primary btn-full" onclick="confirmDeposit()">Add to Aqua Fund 💰</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== WITHDRAW ===================== -->
+<div id="screen-withdraw" class="screen hidden">
+    <div class="screen-content">
+        <div class="header">
+            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
+            <span class="header-title">WITHDRAW</span>
+        </div>
+        <div class="warning-banner">
+            ⚠️ Requests are held 24 hours before you can confirm — sleep on it first.
+        </div>
+        <div class="form-card">
+            <div class="amount-input-group">
+                <span class="currency-symbol">$</span>
+                <input type="number" id="withdraw-amount" placeholder="0" min="1" inputmode="decimal"
+                       oninput="onWithdrawAmountChange()">
+            </div>
+            <div class="form-group">
+                <label>Why do you need this?</label>
+                <select id="withdraw-reason" onchange="onWithdrawReasonChange()">
+                    <option value="">Select a reason...</option>
+                    <option value="Emergency">Emergency</option>
+                    <option value="Food">Food</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Bills">Bills</option>
+                    <option value="Medical">Medical</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group hidden" id="withdraw-explain-group">
+                <label>Explain yourself (min 30 words)</label>
+                <textarea id="withdraw-explanation" rows="5"
+                    placeholder="Be honest with yourself. Why do you really need this? What will you spend it on? Is it worth delaying your Aqua for?"
+                    oninput="onExplanationInput()"></textarea>
+                <div class="word-count" id="word-count">0 / 30 words</div>
+            </div>
+            <div class="impact-card hidden" id="withdraw-impact">
+                <div class="impact-title">Goal Impact</div>
+                <div class="impact-text" id="impact-text"></div>
+                <div class="impact-detail" id="impact-detail"></div>
+            </div>
+            <button class="btn-danger btn-full" id="withdraw-submit-btn" onclick="submitWithdrawal()" disabled>
+                Request Withdrawal
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== PENDING ===================== -->
+<div id="screen-pending" class="screen hidden">
+    <div class="screen-content">
+        <div class="header">
+            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
+            <span class="header-title">PENDING REQUEST</span>
+        </div>
+        <div class="pending-card">
+            <div class="pending-amount" id="pending-amount">$0</div>
+            <div class="pending-label">withdrawal requested</div>
+            <div class="pending-reason-box">
+                <div class="pending-reason-label">Your reason</div>
+                <div class="pending-reason-text" id="pending-reason-text"></div>
+            </div>
+            <div class="pending-timer" id="pending-timer"></div>
+            <div class="pending-impact" id="pending-impact-text"></div>
+        </div>
+        <button class="btn-danger btn-full" id="confirm-withdraw-btn"
+                onclick="confirmWithdrawal()" disabled>
+            Confirm Withdrawal
+        </button>
+        <button class="btn-success btn-full" onclick="cancelWithdrawal()">
+            Cancel — Keep My Aqua Fund 💪
+        </button>
+    </div>
+</div>
+
+<!-- ===================== HISTORY ===================== -->
+<div id="screen-history" class="screen hidden">
+    <div class="screen-content">
+        <div class="header">
+            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
+            <span class="header-title">HISTORY</span>
+        </div>
+        <div id="history-list" class="transaction-list full"></div>
+    </div>
+</div>
+
+<!-- ===================== MILESTONES ===================== -->
+<div id="screen-milestones" class="screen hidden">
+    <div class="screen-content">
+        <div class="header">
+            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
+            <span class="header-title">MILESTONES</span>
+        </div>
+        <div class="milestone-header">
+            <div class="milestone-goal">🚗 Toyota Aqua Goal: $10,330</div>
+            <div class="milestone-subtitle">Save $519/month → driving by Nov 2027</div>
+        </div>
+        <div id="milestone-list" class="milestone-list"></div>
+    </div>
+</div>
+
+<!-- ===================== OVERLAY ===================== -->
+<div id="success-overlay" class="overlay hidden">
+    <div class="overlay-content">
+        <span class="success-icon" id="success-icon">🎉</span>
+        <div class="success-title" id="success-title"></div>
+        <div class="success-msg"   id="success-msg"></div>
+        <button class="btn-primary" onclick="hideOverlay()">Let's go!</button>
+    </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
