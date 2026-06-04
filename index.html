@@ -78,15 +78,6 @@
             <button class="icon-btn" onclick="lockApp()">🔒</button>
         </div>
 
-        <div id="pending-alert" class="alert-card hidden">
-            <div class="alert-icon">⏳</div>
-            <div class="alert-text">
-                <strong>Withdrawal Pending</strong>
-                <span id="pending-countdown"></span>
-            </div>
-            <button class="btn-small" onclick="showScreen('pending')">View</button>
-        </div>
-
         <div class="balance-card">
             <div class="balance-label">AQUA FUND BALANCE</div>
             <div class="balance-amount" id="dashboard-balance">$0</div>
@@ -116,17 +107,17 @@
         </div>
 
         <div class="actions-grid">
-            <button class="action-btn deposit"    onclick="showScreen('deposit')">
+            <button class="action-btn deposit"  onclick="showScreen('deposit')">
                 <span class="action-icon">💰</span><span>Deposit</span>
             </button>
-            <button class="action-btn withdraw"   onclick="showScreen('withdraw')">
+            <button class="action-btn withdraw" onclick="showScreen('withdraw')">
                 <span class="action-icon">📤</span><span>Withdraw</span>
             </button>
-            <button class="action-btn history"    onclick="showScreen('history')">
+            <button class="action-btn history"  onclick="showScreen('history')">
                 <span class="action-icon">📋</span><span>History</span>
             </button>
-            <button class="action-btn milestones" onclick="showScreen('milestones')">
-                <span class="action-icon">🎯</span><span>Goals</span>
+            <button class="action-btn stats"    onclick="showScreen('stats')">
+                <span class="action-icon">📊</span><span>Stats</span>
             </button>
         </div>
 
@@ -166,18 +157,16 @@
             <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
             <span class="header-title">WITHDRAW</span>
         </div>
-        <div class="warning-banner">
-            ⚠️ Requests are held 24 hours before you can confirm — sleep on it first.
-        </div>
         <div class="form-card">
+            <div class="form-balance">Balance: <strong id="withdraw-current-balance">$0</strong></div>
             <div class="amount-input-group">
                 <span class="currency-symbol">$</span>
                 <input type="number" id="withdraw-amount" placeholder="0" min="1" inputmode="decimal"
                        oninput="onWithdrawAmountChange()">
             </div>
             <div class="form-group">
-                <label>Why do you need this?</label>
-                <select id="withdraw-reason" onchange="onWithdrawReasonChange()">
+                <label>What's it for?</label>
+                <select id="withdraw-reason" onchange="validateWithdrawForm()">
                     <option value="">Select a reason...</option>
                     <option value="Emergency">Emergency</option>
                     <option value="Food">Food</option>
@@ -187,12 +176,9 @@
                     <option value="Other">Other</option>
                 </select>
             </div>
-            <div class="form-group hidden" id="withdraw-explain-group">
-                <label>Explain yourself (min 30 words)</label>
-                <textarea id="withdraw-explanation" rows="5"
-                    placeholder="Be honest with yourself. Why do you really need this? What will you spend it on? Is it worth delaying your Aqua for?"
-                    oninput="onExplanationInput()"></textarea>
-                <div class="word-count" id="word-count">0 / 30 words</div>
+            <div class="form-group">
+                <label>Note (optional)</label>
+                <input type="text" id="withdraw-note" placeholder="e.g. Groceries, taxi fare…">
             </div>
             <div class="impact-card hidden" id="withdraw-impact">
                 <div class="impact-title">Goal Impact</div>
@@ -200,36 +186,9 @@
                 <div class="impact-detail" id="impact-detail"></div>
             </div>
             <button class="btn-danger btn-full" id="withdraw-submit-btn" onclick="submitWithdrawal()" disabled>
-                Request Withdrawal
+                Withdraw Now
             </button>
         </div>
-    </div>
-</div>
-
-<!-- ===================== PENDING ===================== -->
-<div id="screen-pending" class="screen hidden">
-    <div class="screen-content">
-        <div class="header">
-            <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
-            <span class="header-title">PENDING REQUEST</span>
-        </div>
-        <div class="pending-card">
-            <div class="pending-amount" id="pending-amount">$0</div>
-            <div class="pending-label">withdrawal requested</div>
-            <div class="pending-reason-box">
-                <div class="pending-reason-label">Your reason</div>
-                <div class="pending-reason-text" id="pending-reason-text"></div>
-            </div>
-            <div class="pending-timer" id="pending-timer"></div>
-            <div class="pending-impact" id="pending-impact-text"></div>
-        </div>
-        <button class="btn-danger btn-full" id="confirm-withdraw-btn"
-                onclick="confirmWithdrawal()" disabled>
-            Confirm Withdrawal
-        </button>
-        <button class="btn-success btn-full" onclick="cancelWithdrawal()">
-            Cancel — Keep My Aqua Fund 💪
-        </button>
     </div>
 </div>
 
@@ -244,18 +203,25 @@
     </div>
 </div>
 
-<!-- ===================== MILESTONES ===================== -->
-<div id="screen-milestones" class="screen hidden">
+<!-- ===================== STATS ===================== -->
+<div id="screen-stats" class="screen hidden">
     <div class="screen-content">
         <div class="header">
             <button class="back-btn" onclick="showScreen('dashboard')">← Back</button>
-            <span class="header-title">MILESTONES</span>
+            <span class="header-title">STATS</span>
         </div>
+
+        <div class="section-header">Savings Milestones</div>
         <div class="milestone-header">
             <div class="milestone-goal">🚗 Toyota Aqua Goal: $10,330</div>
             <div class="milestone-subtitle">Save $519/month → driving by Nov 2027</div>
         </div>
-        <div id="milestone-list" class="milestone-list"></div>
+        <div id="milestone-list" class="milestone-list" style="margin-bottom:28px;"></div>
+
+        <div class="section-header">Spending Breakdown</div>
+        <div id="spending-stats" class="stats-row" style="margin-bottom:14px;"></div>
+        <div id="spending-categories" style="padding-bottom:40px;"></div>
+
     </div>
 </div>
 
@@ -265,7 +231,7 @@
         <span class="success-icon" id="success-icon">🎉</span>
         <div class="success-title" id="success-title"></div>
         <div class="success-msg"   id="success-msg"></div>
-        <button class="btn-primary" onclick="hideOverlay()">Let's go!</button>
+        <button class="btn-primary" onclick="hideOverlay()">Got it</button>
     </div>
 </div>
 

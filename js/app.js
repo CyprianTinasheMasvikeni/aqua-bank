@@ -32,7 +32,6 @@ let state = {
     balance: 0,
     target: TARGET_AMOUNT,
     transactions: [],
-    pendingWithdrawal: null,
     streakStart: null,
     lastWithdrawal: null,
     failedPins: 0,
@@ -110,9 +109,9 @@ function showScreen(name) {
     if (el) el.classList.remove('hidden');
     if (name === 'dashboard') renderDashboard();
     if (name === 'deposit')   renderDeposit();
+    if (name === 'withdraw')  renderWithdraw();
     if (name === 'history')   renderHistory();
-    if (name === 'milestones') renderMilestones();
-    if (name === 'pending')   renderPending();
+    if (name === 'stats')     renderStats();
 }
 
 // ---- PIN KEYPAD BUILDER ----
@@ -205,7 +204,7 @@ function completeSetup() {
         });
     }
     save();
-    showOverlay('🚗 Let\'s Go!', `Aqua Bank is set up. Your goal: ${fmt(state.target)} for the Toyota Aqua. Save ${fmt(MONTHLY_SAVINGS)}/month and you'll be driving by Nov 2027.`);
+    showOverlay('🚗 Let\'s Go!', `Aqua Bank is set up. Goal: ${fmt(state.target)} for the Toyota Aqua. Save ${fmt(MONTHLY_SAVINGS)}/month and you'll be driving by Nov 2027.`);
 }
 
 // ---- PIN UNLOCK ----
@@ -288,17 +287,6 @@ function renderDashboard() {
     document.getElementById('stat-months').textContent  = months;
     document.getElementById('stat-monthly').textContent = fmt(MONTHLY_SAVINGS);
 
-    const pendAlert = document.getElementById('pending-alert');
-    if (state.pendingWithdrawal) {
-        pendAlert.classList.remove('hidden');
-        const ready = Date.now() >= new Date(state.pendingWithdrawal.canConfirmAt).getTime();
-        document.getElementById('pending-countdown').textContent = ready
-            ? 'Ready to confirm'
-            : `~${Math.ceil((new Date(state.pendingWithdrawal.canConfirmAt) - Date.now()) / 3600000)}h remaining`;
-    } else {
-        pendAlert.classList.add('hidden');
-    }
-
     renderRecentTxns();
 }
 
@@ -315,13 +303,14 @@ function txnHTML(t) {
     const icon  = dep ? '💰' : '📤';
     const sign  = dep ? '+' : '-';
     const cls   = dep ? 'deposit' : 'withdrawal';
-    const label = dep ? (t.note || 'Deposit') : ('Withdrawal' + (t.reason ? ' — ' + t.reason : ''));
+    const label = dep ? (t.note || 'Deposit') : (t.reason || 'Withdrawal');
+    const sub   = !dep && t.note ? ' · ' + t.note : '';
     return `
         <div class="transaction-item">
             <div class="transaction-icon">${icon}</div>
             <div class="transaction-details">
                 <div class="transaction-type">${label}</div>
-                <div class="transaction-date">${fmtDate(t.date)}</div>
+                <div class="transaction-date">${fmtDate(t.date)}${sub}</div>
             </div>
             <div class="transaction-amount ${cls}">${sign}${fmt(t.amount)}</div>
         </div>`;
@@ -365,6 +354,15 @@ function confirmDeposit() {
 
 // ---- WITHDRAWAL ----
 
+function renderWithdraw() {
+    document.getElementById('withdraw-current-balance').textContent = fmt(state.balance);
+    document.getElementById('withdraw-amount').value  = '';
+    document.getElementById('withdraw-reason').value  = '';
+    document.getElementById('withdraw-note').value    = '';
+    document.getElementById('withdraw-impact').classList.add('hidden');
+    document.getElementById('withdraw-submit-btn').disabled = true;
+}
+
 function onWithdrawAmountChange() {
     const amt    = parseFloat(document.getElementById('withdraw-amount').value) || 0;
     const impact = document.getElementById('withdraw-impact');
@@ -379,105 +377,32 @@ function onWithdrawAmountChange() {
     validateWithdrawForm();
 }
 
-function onWithdrawReasonChange() {
-    document.getElementById('withdraw-explain-group').classList.remove('hidden');
-    validateWithdrawForm();
-}
-
-function onExplanationInput() {
-    const txt   = document.getElementById('withdraw-explanation').value;
-    const words = txt.trim().split(/\s+/).filter(w => w).length;
-    const el    = document.getElementById('word-count');
-    el.textContent = `${words} / 30 words`;
-    el.classList.toggle('valid', words >= 30);
-    validateWithdrawForm();
-}
-
 function validateWithdrawForm() {
     const amt    = parseFloat(document.getElementById('withdraw-amount').value) || 0;
     const reason = document.getElementById('withdraw-reason').value;
-    const expl   = document.getElementById('withdraw-explanation').value;
-    const words  = expl.trim().split(/\s+/).filter(w => w).length;
-    const valid  = amt > 0 && amt <= state.balance && reason !== '' && words >= 30;
+    const valid  = amt > 0 && amt <= state.balance && reason !== '';
     document.getElementById('withdraw-submit-btn').disabled = !valid;
 }
 
 function submitWithdrawal() {
     const amt    = parseFloat(document.getElementById('withdraw-amount').value);
     const reason = document.getElementById('withdraw-reason').value;
-    const expl   = document.getElementById('withdraw-explanation').value;
-    if (!amt || amt > state.balance) return;
+    const note   = document.getElementById('withdraw-note').value.trim();
+    if (!amt || amt > state.balance || !reason) return;
 
-    state.pendingWithdrawal = {
-        id: Date.now(),
-        amount: amt, reason, explanation: expl,
-        requestedAt: new Date().toISOString(),
-        canConfirmAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    };
-    save();
-    showScreen('pending');
-}
-
-// ---- PENDING ----
-
-function renderPending() {
-    const pw = state.pendingWithdrawal;
-    if (!pw) { showScreen('dashboard'); return; }
-
-    document.getElementById('pending-amount').textContent = fmt(pw.amount);
-    const reasonText = pw.reason + (pw.explanation ? ': ' + pw.explanation : '');
-    document.getElementById('pending-reason-text').textContent = reasonText;
-
-    const { days } = impactOfWithdrawal(pw.amount);
-    document.getElementById('pending-impact-text').textContent = `This delays your Toyota Aqua by ~${days} days`;
-
-    updatePendingTimer();
-}
-
-function updatePendingTimer() {
-    const pw = state.pendingWithdrawal;
-    if (!pw) return;
-    const ready  = Date.now() >= new Date(pw.canConfirmAt).getTime();
-    const timerEl = document.getElementById('pending-timer');
-    const btn     = document.getElementById('confirm-withdraw-btn');
-    if (ready) {
-        timerEl.textContent = '✓ Waiting period complete';
-        timerEl.style.color = 'var(--danger)';
-        btn.disabled = false;
-    } else {
-        const diff  = new Date(pw.canConfirmAt) - Date.now();
-        const hrs   = Math.floor(diff / 3600000);
-        const mins  = Math.floor((diff % 3600000) / 60000);
-        timerEl.textContent = `${hrs}h ${mins}m until you can confirm`;
-        timerEl.style.color = 'var(--text-dim)';
-        btn.disabled = true;
-    }
-}
-
-function confirmWithdrawal() {
-    const pw = state.pendingWithdrawal;
-    if (!pw) return;
-    if (Date.now() < new Date(pw.canConfirmAt).getTime()) {
-        alert('Not yet — 24 hours must pass first.'); return;
-    }
-    state.balance -= pw.amount;
+    const { days, newDate } = impactOfWithdrawal(amt);
+    state.balance -= amt;
     state.lastWithdrawal = new Date().toISOString();
     state.streakStart    = new Date().toISOString();
     state.transactions.push({
         id: Date.now(), type: 'withdrawal',
-        amount: pw.amount, date: new Date().toISOString(),
-        reason: pw.reason, note: pw.explanation,
-        balance: state.balance
+        amount: amt, date: new Date().toISOString(),
+        reason, note, balance: state.balance
     });
-    state.pendingWithdrawal = null;
     save();
-    showScreen('dashboard');
-}
 
-function cancelWithdrawal() {
-    state.pendingWithdrawal = null;
-    save();
-    showOverlay('💪 Good Call!', "Withdrawal cancelled. Your Aqua Fund is safe.\n\nEvery dollar you keep in is one day closer to driving that Aqua.");
+    const msg = `${fmt(amt)} withdrawn for ${reason}${note ? ' — ' + note : ''}.\n\nBalance: ${fmt(state.balance)}\nGoal pushed back ~${days} days → ${fmtMonth(newDate)}`;
+    showOverlay('📤 Withdrawn', msg);
 }
 
 // ---- HISTORY ----
@@ -490,11 +415,12 @@ function renderHistory() {
         : '<div class="empty-state">No transactions yet.</div>';
 }
 
-// ---- MILESTONES ----
+// ---- STATS (milestones + spending) ----
 
-function renderMilestones() {
-    const el = document.getElementById('milestone-list');
-    el.innerHTML = MILESTONES.map(m => {
+function renderStats() {
+    // Milestones
+    const milestoneEl = document.getElementById('milestone-list');
+    milestoneEl.innerHTML = MILESTONES.map(m => {
         const done    = state.balance >= m.target;
         const current = !done && state.balance >= (m.target - MONTHLY_SAVINGS);
         const cls     = done ? 'completed' : current ? 'current' : '';
@@ -508,6 +434,63 @@ function renderMilestones() {
                     ${desc ? `<div class="milestone-desc">${desc}</div>` : ''}
                 </div>
                 <div class="milestone-target">${fmt(m.target)}</div>
+            </div>`;
+    }).join('');
+
+    // Spending breakdown
+    const withdrawals    = state.transactions.filter(t => t.type === 'withdrawal');
+    const spendStatsEl   = document.getElementById('spending-stats');
+    const spendCatsEl    = document.getElementById('spending-categories');
+
+    if (!withdrawals.length) {
+        spendStatsEl.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:20px 0">No withdrawals yet — keep it that way! 💪</div>';
+        spendCatsEl.innerHTML  = '';
+        return;
+    }
+
+    const totalWithdrawn = withdrawals.reduce((s, t) => s + t.amount, 0);
+    const totalDaysLost  = withdrawals.reduce((s, t) => {
+        return s + Math.round(t.amount / (MONTHLY_SAVINGS / 30));
+    }, 0);
+
+    spendStatsEl.innerHTML = `
+        <div class="stat-card">
+            <div class="stat-value" style="color:var(--danger)">${fmt(totalWithdrawn)}</div>
+            <div class="stat-label">withdrawn</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">${withdrawals.length}</div>
+            <div class="stat-label">withdrawals</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:var(--warn)">${totalDaysLost}</div>
+            <div class="stat-label">days delayed</div>
+        </div>`;
+
+    // Category bars
+    const cats = {};
+    withdrawals.forEach(t => {
+        const r = t.reason || 'Other';
+        if (!cats[r]) cats[r] = { total: 0, count: 0 };
+        cats[r].total += t.amount;
+        cats[r].count += 1;
+    });
+
+    const sorted = Object.entries(cats).sort((a, b) => b[1].total - a[1].total);
+    const maxVal = sorted[0][1].total;
+
+    spendCatsEl.innerHTML = sorted.map(([cat, data]) => {
+        const pct  = Math.round((data.total / maxVal) * 100);
+        const days = Math.round(data.total / (MONTHLY_SAVINGS / 30));
+        return `
+            <div class="spend-item">
+                <div class="spend-header">
+                    <span class="spend-cat">${cat}</span>
+                    <span class="spend-amount">${fmt(data.total)} <span class="spend-count">${data.count}x · ${days}d delay</span></span>
+                </div>
+                <div class="spend-bar-bg">
+                    <div class="spend-bar" style="width:${pct}%"></div>
+                </div>
             </div>`;
     }).join('');
 }
