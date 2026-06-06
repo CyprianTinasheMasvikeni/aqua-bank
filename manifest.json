@@ -1,7 +1,7 @@
 {
     "name": "Aqua Bank",
     "short_name": "Aqua Bank",
-    "description": "Your personal Toyota Aqua savings vault",
+    "description": "Personal savings tracker PWA with PIN lock and withdrawal friction",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#0a0a0a",
